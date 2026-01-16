@@ -1,3 +1,5 @@
 .venv/*
 videos/*
 .env
+output/*
+src/__pycache__/*

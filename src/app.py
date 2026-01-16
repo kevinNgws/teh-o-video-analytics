@@ -71,7 +71,7 @@ def safety_analysis_loop(video_name, user_prompt, progress=gr.Progress()):
     # 4. Stream Processing
     # We use the processor generator to get frames one by one
     frame_generator = processor.process_video_stream(
-        video_path, interval_seconds=1)
+        video_path, interval_seconds=5)
 
     start_time = time.time()
 

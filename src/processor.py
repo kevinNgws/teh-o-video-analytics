@@ -4,6 +4,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from typing import List, Dict, Generator, Tuple
 
+
 class VideoProcessor:
     def __init__(self, output_dir: str = "output"):
         """
@@ -24,17 +25,17 @@ class VideoProcessor:
     def process_video_stream(self, video_path: str, interval_seconds: int = 1) -> Generator[Tuple[float, Image.Image], None, None]:
         """
         Generator that yields frames from a video at a specific time interval.
-        
+
         Args:
             video_path: Path to the local video file.
             interval_seconds: How many seconds to skip between analyzing frames.
                               (e.g., 1 = analyze 1 frame per second).
-        
+
         Yields:
             Tuple containing (timestamp_in_seconds, PIL_Image_Object)
         """
         cap = cv2.VideoCapture(video_path)
-        
+
         if not cap.isOpened():
             raise ValueError(f"Could not open video file: {video_path}")
 
@@ -50,11 +51,11 @@ class VideoProcessor:
             # Only process frames at the specific interval
             if frame_count % frame_interval == 0:
                 timestamp = frame_count / fps
-                
+
                 # Convert OpenCV BGR format to RGB (standard for AI models/PIL)
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 pil_image = Image.fromarray(frame_rgb)
-                
+
                 yield timestamp, pil_image
 
             frame_count += 1
@@ -62,71 +63,60 @@ class VideoProcessor:
         cap.release()
 
     def draw_detections(self, image: Image.Image, detections: List[Dict]) -> str:
-        """
-        Draws bounding boxes and labels on the image and saves it to disk.
-
-        Args:
-            image: The original PIL image.
-            detections: List of dictionaries. Example format:
-                        [
-                            {
-                                "box": [ymin, xmin, ymax, xmax], # Normalized 0-1000
-                                "label": "No Helmet",
-                                "severity": "high"
-                            }
-                        ]
-        
-        Returns:
-            str: Path to the saved image file.
-        """
         draw = ImageDraw.Draw(image)
         width, height = image.size
-        
-        # Try to load a default font, strictly optional fallback if system font fails
+
+        # Load font... (same as before)
         try:
             font = ImageFont.truetype("Arial.ttf", size=20)
         except IOError:
             font = ImageFont.load_default()
 
-        found_anomaly = False
-
         for det in detections:
-            found_anomaly = True
             box = det.get("box", [])
             label = det.get("label", "Anomaly")
             severity = det.get("severity", "unknown").lower()
-            
-            # Skip if box is malformed
+
             if len(box) != 4:
                 continue
 
-            # Unpack and denormalize coordinates (assuming 0-1000 scale from InternVL/Gemini)
-            # Standard Format: [ymin, xmin, ymax, xmax]
-            ymin, xmin, ymax, xmax = box
-            
-            left = (xmin / 1000) * width
-            top = (ymin / 1000) * height
-            right = (xmax / 1000) * width
-            bottom = (ymax / 1000) * height
+            # --- CRITICAL: Coordinate Mapping ---
+            # Prompt requested: [ymin, xmin, ymax, xmax]
+            # ImageDraw expects: [x0, y0, x1, y1] (Left, Top, Right, Bottom)
+
+            ymin_norm, xmin_norm, ymax_norm, xmax_norm = box
+
+            # Denormalize (0-1000 -> pixels)
+            left = (xmin_norm / 1000) * width
+            top = (ymin_norm / 1000) * height
+            right = (xmax_norm / 1000) * width
+            bottom = (ymax_norm / 1000) * height
+
+            # Safety clamp (keep box inside image)
+            left = max(0, min(left, width))
+            top = max(0, min(top, height))
+            right = max(0, min(right, width))
+            bottom = max(0, min(bottom, height))
 
             color = self.severity_colors.get(severity, (0, 255, 0))
 
-            # Draw the Box (thick lines for visibility)
+            # Draw Box
             draw.rectangle([left, top, right, bottom], outline=color, width=4)
 
-            # Draw the Label Background
-            text_bbox = draw.textbbox((left, top), f"{label} ({severity})", font=font)
+            # Draw Label
+            text_str = f"{label} ({severity.title()})"
+
+            # Calculate text background size
+            text_bbox = draw.textbbox((left, top), text_str, font=font)
+
+            # Draw label background
             draw.rectangle(text_bbox, fill=color)
 
-            # Draw the Text
-            draw.text((left, top), f"{label} ({severity})", fill="black", font=font)
+            # Draw text
+            draw.text((left, top), text_str, fill="black", font=font)
 
-        # Save result
         filename = f"detection_{int(cv2.getTickCount())}.jpg"
         save_path = os.path.join(self.output_dir, filename)
-        
-        # If no anomalies, we might still want to return the path or None
-        # For this POC, we return path regardless, but you can filter here.
         image.save(save_path)
-        
+
         return save_path
