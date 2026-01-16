@@ -1,0 +1,12 @@
+gradio
+torch
+torchvision
+transformers
+accelerate
+opencv-python
+pillow
+einops
+timm
+langchain
+protobuf
+sentencepiece

@@ -1,0 +1,16 @@
+[project]
+name = "local-safety-poc"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "gradio>=4.0.0",
+    "torch",
+    "torchvision",
+    "transformers>=4.40.0",
+    "accelerate",
+    "opencv-python",
+    "pillow",
+    "einops",  # Required for InternVL
+    "timm",    # Required for InternVL Vision Encoder
+    "langchain"
+]
