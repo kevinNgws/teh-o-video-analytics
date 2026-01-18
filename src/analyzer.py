@@ -12,7 +12,14 @@ MODEL_PATH = "OpenGVLab/InternVL3-8B"  # or 1B/2B depending on RAM
 
 class SafetyAnalyzer:
     def __init__(self):
-        self.device = "mps" if torch.backends.mps.is_available() else "cpu"
+        # self.device = "mps" if torch.backends.mps.is_available() else "cpu"
+        if torch.cuda.is_available():
+            self.device = "cuda"
+        elif torch.backends.mps.is_available():
+            self.device = "mps"
+        else:
+            self.device = "cpu"
+
         print(f"Initializing SafetyAnalyzer on {self.device}...")
 
         self.tokenizer = AutoTokenizer.from_pretrained(
